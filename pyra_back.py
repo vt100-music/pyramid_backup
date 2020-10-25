@@ -12,8 +12,10 @@ import sys
 
 
 def match_sha1(dir1, dir2):
-  dir1_sha = dirhash(dir1, 'sha1')
-  dir2_sha = dirhash(dir2, 'sha1')
+  dir1_sha = dirhash(dir1, 'md5')
+  dir2_sha = dirhash(dir2, 'md5')
+  print(dir1_sha)
+  print(dir2_sha)
   if dir1_sha == dir2_sha:
     return True
   return False
@@ -88,16 +90,17 @@ def main():
         res = subprocess.run(['git', 'commit', '-m', cmt_msg],
                              capture_output=True)
         res.check_returncode()
-        print(res.stdout)
+        print(res.stdout.decode('UTF-8'))
         print("Changes committed, pushing...")
         res = subprocess.run(['git', 'push'], capture_output=True)
         res.check_returncode()
-        print(res.stdout)
+        print(res.stdout.decode('UTF-8'))
         print("Done!")
 
     except Exception:
       print("Looks like there was a problem running git commands")
       print("Check the git repo cause shits weird.")
+      print(res.stdout.decode('UTF-8'))
       import traceback
       print(traceback.format_exc())
 
