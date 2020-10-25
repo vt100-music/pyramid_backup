@@ -3,6 +3,7 @@
 from argparse import ArgumentParser
 from checksumdir import dirhash
 from datetime import datetime
+from filecmp import dircmp
 from getpass import getuser
 from pathlib import Path
 import shutil
@@ -14,12 +15,19 @@ import sys
 def match_sha1(dir1, dir2):
   dir1_sha = dirhash(dir1, 'md5')
   dir2_sha = dirhash(dir2, 'md5')
-  print(dir1_sha)
-  print(dir2_sha)
   if dir1_sha == dir2_sha:
     return True
   return False
 
+def clean_backup(backup_dir, card_dir):
+  '''Clean out files that only exist in the backup '''
+  comp = dircmp(backup_dir, card_dir)
+  backup_files = [f for f in os.listdir(backup_dir) if not f.startswith('.')]
+  print(backup_files)
+  for b_file in backup_files:
+    if b_file not in comp.common:
+      print("Deleting: {}".format(b_file))
+      os.remove(os.path.join(backup_dir, b_file))  
 
 def main():
   user = getuser()
@@ -72,6 +80,7 @@ def main():
           if not match_sha1(pyra_backup, pyra_card):
             print("{} on the card is newer, copying...".format(pyra_card))
             shutil.copytree(pyra_card, pyra_backup, dirs_exist_ok=True)
+            clean_backup(pyra_backup, pyra_card)
             new = True
 
           else:
