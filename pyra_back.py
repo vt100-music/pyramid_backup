@@ -89,7 +89,11 @@ def eval_and_copy(backup_path, pyra_path, pyra_dir):
     p_pash = dirhash(pyra_card)
     mods = False
     backup_changes = False
-    if manifest[pyra_dir][0] != p_pash:
+    if pyra_dir not in manifest:
+        print("{} appears to be new to the card, doing nothing...".format(pyra_dir))
+        return False
+
+    elif manifest[pyra_dir][0] != p_pash:
         print("Modifications on memory card for {}".format(pyra_dir))
         # We know there's something on the card worth saving,
         # now let's see if it's safe to copy to the git repository
@@ -232,6 +236,8 @@ def main():
 
     if new:
         checkin_to_git(backup_path)
+
+    # It's always okay to make the card manifest up to date.
     generate_manifest(pyra_path, pyra_dirs)
 
 
