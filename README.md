@@ -42,7 +42,8 @@ optional arguments:
                         Path to pyra card
                         
 Example:
-
+cd pyramid_backup
+./setup.sh
 (venv) carl@Protocol-C pyramid_backup % ./pyra_back.py --backup-folder /Users/carl/Desktop/pyra_back --pyra-card /Volumes/PYRAMID_NEW
 
 PYRA_150_3 appears to be new to the card, doing nothing...
