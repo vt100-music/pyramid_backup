@@ -1,23 +1,15 @@
 #!python
-
 from argparse import ArgumentParser
 from checksumdir import dirhash
 from datetime import datetime
 from filecmp import dircmp
 from getpass import getuser
 from pathlib import Path
+from prompt_toolkit import prompt
 import shutil
 import subprocess
 import os
 import sys
-
-
-def match_sha1(dir1, dir2):
-    dir1_sha = dirhash(dir1, 'md5')
-    dir2_sha = dirhash(dir2, 'md5')
-    if dir1_sha == dir2_sha:
-        return True
-    return False
 
 
 def clean_backup(backup_dir, card_dir):
@@ -31,27 +23,167 @@ def clean_backup(backup_dir, card_dir):
             os.remove(os.path.join(backup_dir, b_file))
 
 
-def copy_from_card(backup_path, pyra_dirs):
+def generate_manifest(pyra_path, pyra_dirs, manifest_dest=None):
+    timestamp = datetime.now().strftime("%d/%m/%Y:%H:%M:%S")
+    output = ""
+    for pyra_dir in pyra_dirs:
+        pyra_card = os.path.join(pyra_path, pyra_dir)
+        if os.path.exists(pyra_card):
+            md5 = dirhash(pyra_card)
+            output += "{} {} {}\n".format(pyra_dir, md5, timestamp)
+    if manifest_dest:
+        manifest_path = os.path.join(manifest_dest, 'MANIFEST')
+    else:
+        manifest_path = os.path.join(pyra_path, 'MANIFEST')
+    print("Writing manifest to: {}".format(manifest_path))
+    with open(manifest_path, 'w') as manifest:
+        manifest.write(output)
+
+
+def get_manifest_dict(pyra_path):
+    manifest = {}
+    try:
+        with open(os.path.join(pyra_path, 'MANIFEST')) as manifest_file:
+            for line in manifest_file.readlines():
+                p_dir, md, md_time = line.split(' ')
+                manifest[p_dir] = (md, md_time.strip())
+        return manifest
+    except Exception:
+        return {}
+
+
+def git_has_local_changes(backup_path, pyra_dir, card_timestamp):
+    log_cmd = "git -C {} log -1 -- {} | head -n1".format(backup_path, pyra_dir)
+    log_proc = subprocess.run(log_cmd, capture_output=True, shell=True)
+    commit = log_proc.stdout.decode('UTF-8').split(' ')[-1].strip()
+    show_cmd = "git -C {} show -s --format=%ci {}".format(backup_path, commit)
+    show_proc = subprocess.run(show_cmd, capture_output=True, shell=True)
+    commit_time = show_proc.stdout.decode('UTF-8').strip()
+    # Trim off git's time zone since that's not yet supported.
+    commit_time = " ".join(commit_time.split(' ')[0:2])
+    card_dt = datetime.strptime(card_timestamp, "%d/%m/%Y:%H:%M:%S")
+    git_dt = datetime.strptime(commit_time, "%Y-%m-%d %H:%M:%S")
+    if git_dt <= card_dt:
+        return False
+    print("git has local changes for {}".format(pyra_dir))
+    return True
+
+
+def eval_and_copy(backup_path, pyra_path, pyra_dir):
+    # XXX - if we have multiple cards where the same track may be
+    # changing, we need to verify that the card is newer more robustly
+    # than simply the hashes don't match.  If the hashes don't match
+    # we know that there's a difference, but not necessarily that the
+    # card is newer.
+    # The new scheme will be that we will write manifests on the card
+    # and if this manifest is out of date, then we know the track has
+    # been modified on the card.
+    # We'll also include a datestamp in the manifest and verify this
+    # against the repository.  If the most recent commit for a song
+    # is newer than the datestamp in the manifest, then we know that
+    # what's on the card and what's on disk have a merge conflict.
+    pyra_backup = os.path.join(backup_path, pyra_dir)
+    pyra_card = os.path.join(pyra_path, pyra_dir)
+
+    manifest = get_manifest_dict(pyra_path)
+    p_pash = dirhash(pyra_card)
+    mods = False
+    backup_changes = False
+    if manifest[pyra_dir][0] != p_pash:
+        print("Modifications on memory card for {}".format(pyra_dir))
+        # We know there's something on the card worth saving,
+        # now let's see if it's safe to copy to the git repository
+        mods = True
+
+    if git_has_local_changes(backup_path, pyra_dir, manifest[pyra_dir][1]):
+        backup_changes = True
+
+    copy = False
+    if backup_changes and not mods:
+        print("Backup repository has changes not on card")
+        ans = prompt("Would you like to sync these changes to the card? (y/n)")
+        if ans.lower() == 'y':
+            print("Copying {} from backup to card".format(pyra_dir))
+            shutil.rmtree(pyra_card)
+            shutil.copytree(pyra_backup, pyra_card)
+
+    elif backup_changes and mods:
+        # TODO - WARNING
+        print("backup repo and card have diverged.  This means there are")
+        print("unique changes in your backup and unique changes to your card.")
+        print("\n\nYour selection here may DESTROY data FOREVER.")
+        print("1. Copy the contents of the card OVER the backup")
+        print("2. Copy the contents of the backup OVER the card")
+        print("3. Do nothing - resolve this yourself")
+        ans = prompt("Select your choice (1, 2, 3): ")
+        if ans == "1":
+            copy = True
+        elif ans == "2":
+            print("Copying {} from backup to card".format(pyra_dir))
+            shutil.rmtree(pyra_card)
+            shutil.copytree(pyra_backup, pyra_card)
+        else:
+            print("Doing nothing - backups not made for {}".format(pyra_dir))
+
+    elif mods and not backup_changes:
+        print("{} on the card is newer, copying...".format(pyra_card))
+        copy = True
+
+    elif not mods and not backup_changes:
+        print("{}: new changes not detected on card".format(pyra_card))
+
+    if copy:
+        shutil.copytree(pyra_card, pyra_backup, dirs_exist_ok=True)
+        clean_backup(pyra_backup, pyra_card)
+        return True
+    return False
+
+
+def copy_from_card(backup_path, pyra_path, pyra_dirs):
     # For now we'll only backup the PYRA directories and not the txt files
     backup_dirs = [d for d in os.listdir(backup_path) if "PYRA" in d]
-    new = False
+    repo_changes = False
     for pyra_dir in pyra_dirs:
-        pyra_backup = os.path.join(backup_path, pyra_dir)
-        pyra_card = os.path.join(pyra_path, pyra_dir)
         if pyra_dir not in backup_dirs:
+            pyra_backup = os.path.join(backup_path, pyra_dir)
+            pyra_card = os.path.join(pyra_path, pyra_dir)
             print("{} not found: new backup".format(pyra_dir))
             shutil.copytree(pyra_card, pyra_backup, dirs_exist_ok=True)
             new = True
         else:
-            if not match_sha1(pyra_backup, pyra_card):
-                print("{} on the card is newer, copying...".format(pyra_card))
-                shutil.copytree(pyra_card, pyra_backup, dirs_exist_ok=True)
-                clean_backup(pyra_backup, pyra_card)
-                new = True
+            new = eval_and_copy(backup_path, pyra_path, pyra_dir)
+        repo_changes = repo_changes or new
+    return repo_changes
 
-            else:
-                print("{} checksums match".format(pyra_card))
-    return new
+
+def checkin_to_git(backup_path):
+    try:
+        print("Commiting changes to git...")
+        cwd = os.getcwd()
+        os.chdir(backup_path)
+        res = subprocess.run(['git', 'add', '-A'])
+        res.check_returncode()
+        timestamp = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+        cmt_msg = "Backup on {}".format(timestamp)
+        res = subprocess.run(['git', 'commit', '-m', cmt_msg],
+                             capture_output=True)
+        res.check_returncode()
+        print(res.stdout.decode('UTF-8'))
+        print("Changes committed, pushing...")
+        res = subprocess.run(['git', 'push'], capture_output=True)
+        res.check_returncode()
+        print(res.stdout.decode('UTF-8'))
+        print("Done!")
+
+    except Exception:
+        print("Looks like there was a problem running git commands")
+        print("Check the git repo cause shits weird.")
+        print(res.stdout.decode('UTF-8'))
+        import traceback
+        print(traceback.format_exc())
+
+    finally:
+        os.chdir(cwd)
 
 
 def main():
@@ -91,36 +223,16 @@ def main():
             print("No pyramid directories found on the card")
             sys.exit(1)
 
-    new = copy_from_card(backup_path, pyra_dirs)
+    manifest_path = os.path.join(pyra_path, 'MANIFEST')
+    if not os.path.exists(manifest_path):
+        print("MANIFEST not found on card, generating from git")
+        generate_manifest(backup_path, pyra_dirs, manifest_dest=pyra_path)
+
+    new = copy_from_card(backup_path, pyra_path, pyra_dirs)
 
     if new:
-        try:
-            print("Commiting changes to git...")
-            cwd = os.getcwd()
-            os.chdir(backup_path)
-            res = subprocess.run(['git', 'add', '-A'])
-            res.check_returncode()
-            timestamp = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
-            cmt_msg = "Backup on {}".format(timestamp)
-            res = subprocess.run(['git', 'commit', '-m', cmt_msg],
-                                 capture_output=True)
-            res.check_returncode()
-            print(res.stdout.decode('UTF-8'))
-            print("Changes committed, pushing...")
-            res = subprocess.run(['git', 'push'], capture_output=True)
-            res.check_returncode()
-            print(res.stdout.decode('UTF-8'))
-            print("Done!")
-
-        except Exception:
-            print("Looks like there was a problem running git commands")
-            print("Check the git repo cause shits weird.")
-            print(res.stdout.decode('UTF-8'))
-            import traceback
-            print(traceback.format_exc())
-
-        finally:
-            os.chdir(cwd)
+        checkin_to_git(backup_path)
+        generate_manifest(pyra_path, pyra_dirs)
 
 
 if __name__ == "__main__":
