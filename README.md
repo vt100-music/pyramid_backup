@@ -13,6 +13,14 @@ I've only run this on my iMac though this should work in linux.  I doubt it will
 
 To run the script, you must have python 3.8 or newer cause I'm a jerk and used new features:
 
+:: Script Features ::
+   * Copies new and modified songs to your git repository and submits them to git
+   * Multi Card Support
+   ** Detects and warns about divergence (same song, different edits on multiple cards)
+   ** Detects if the repository was updated but not a card (you updates a song on one card but not another card)
+
+Note on Divergence:  Divergence is a tricky situation where you have multiple valid changes to a set of files.  In the case of the Pyramid, this means that you author and save modifications to the same song on several card.  If this was source code, we have ways of merging the two changes together, however there's no way to merge core files (yet) and I'm also not about to try to figure out midi merge -- this effectively means that your options are limited if this situation arises.  With pyraback you can choose to override either the card or the backup with the song revision of your choosing.  However, if you truly want to merge the changes from the two (or more) edits of a track, you'll have to do this manually on the Pyramid.
+
 Installation requirements:
    * python 3
    * virtualenv  (pip install virtualenv from your python 3 host env)
@@ -34,3 +42,10 @@ optional arguments:
                         Path to pyra card
                         
 Example:
+
+(venv) carl@Protocol-C pyramid_backup % ./pyra_back.py --backup-folder /Users/carl/Desktop/pyra_back --pyra-card /Volumes/PYRAMID_NEW
+
+PYRA_150_3 appears to be new to the card, doing nothing...
+PYRA_150_4 appears to be new to the card, doing nothing...
+
+
