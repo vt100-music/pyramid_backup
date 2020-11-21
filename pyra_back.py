@@ -104,7 +104,7 @@ def eval_and_copy(backup_path, pyra_path, pyra_dir):
         ans = prompt("Would you like to sync these changes to the card? (y/n)")
         if ans.lower() == 'y':
             print("Copying {} from backup to card".format(pyra_dir))
-            shutil.rmtree(pyra_card)
+            shutil.rmtree(pyra_card, ignore_errors=True)
             shutil.copytree(pyra_backup, pyra_card)
 
     elif backup_changes and mods:
@@ -120,7 +120,7 @@ def eval_and_copy(backup_path, pyra_path, pyra_dir):
             copy = True
         elif ans == "2":
             print("Copying {} from backup to card".format(pyra_dir))
-            shutil.rmtree(pyra_card)
+            shutil.rmtree(pyra_card, ignore_errors=True)
             shutil.copytree(pyra_backup, pyra_card)
         else:
             print("Doing nothing - backups not made for {}".format(pyra_dir))
@@ -232,7 +232,7 @@ def main():
 
     if new:
         checkin_to_git(backup_path)
-        generate_manifest(pyra_path, pyra_dirs)
+    generate_manifest(pyra_path, pyra_dirs)
 
 
 if __name__ == "__main__":
