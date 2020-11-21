@@ -13,6 +13,16 @@ I've only run this on my iMac though this should work in linux.  I doubt it will
 
 To run the script, you must have python 3.8 or newer cause I'm a jerk and used new features:
 
+Installation requirements:
+   * python 3
+   * virtualenv  (pip install virtualenv from your python 3 host env)
+
+Running the script:
+   * git clone https://github.com/vt100-music/pyramid_backup.git
+   * cd to pyramaid_backup
+   * ./setup.sh  (this will setup and enter the runtime env)
+   * Run the script
+
 carl@Protocol-C pyramid_backup % python pyra_back.py -h
 usage: pyra_back.py [-h] [--backup-folder BACKUP_PATH] [--pyra-card PYRA_PATH]
 
