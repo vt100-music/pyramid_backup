@@ -16,7 +16,6 @@ def clean_backup(backup_dir, card_dir):
     '''Clean out files that only exist in the backup '''
     comp = dircmp(backup_dir, card_dir)
     backup_files = [f for f in os.listdir(backup_dir) if not f.startswith('.')]
-    print(backup_files)
     for b_file in backup_files:
         if b_file not in comp.common:
             print("Deleting: {}".format(b_file))
@@ -104,7 +103,7 @@ def eval_and_copy(backup_path, pyra_path, pyra_dir):
 
     copy = False
     if backup_changes and not mods:
-        print("Backup repository has changes not on card")
+        print("Backup repository has changes not on card: {}".format(pyra_dir))
         ans = prompt("Would you like to sync these changes to the card? (y/n)")
         if ans.lower() == 'y':
             print("Copying {} from backup to card".format(pyra_dir))
