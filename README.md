@@ -1,4 +1,4 @@
-Welcome to the Squarp Pyramid Backup Utility
+Welcome to the Squarp Pyramid Backup Utility 
 
 The Squarp Pyramid is a MIDI sequencer and stores midi songs and song settings on an SD card.  SD cards can break, get lost, who knows - so backups are important.  Of course a simple solution is simply to copy your card to your computer once in a while - and this is what I did for quite some time.  This works if you don't mind managing the revisions yourself (or don't store revisions) and if you have a single memory card.  After a couple of years this got unwieldy as I had a large number of folders.  Then, to make matters more interesting, I started working with multiple SD cards to work around some of the limitation in the Pyramid.  This left me in a situation where I was trying to copy the contents of two different cards into a directory with lots of other directories in it.  Ugh.
 
